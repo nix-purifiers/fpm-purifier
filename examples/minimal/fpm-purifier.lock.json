@@ -1,0 +1,71 @@
+{
+  "configuration": {
+    "features": "",
+    "profile": ""
+  },
+  "entries": [
+    {
+      "git": {
+        "commitObject": null,
+        "leaveDotGit": false,
+        "rev": "4d43ffea512977602f654ab10067fcddb3e3c107",
+        "submodules": false,
+        "url": "https://github.com/toml-f/jonquil.git"
+      },
+      "hash": "sha256-2JCTHA0nyA7xE0IA+LNrEAulHU2eIbNRvFGQ7YSQMRE=",
+      "path": "git/jonquil"
+    },
+    {
+      "git": {
+        "commitObject": null,
+        "leaveDotGit": false,
+        "rev": "6290b0bc5f5ebeff231625a3b6685de85f33fc79",
+        "submodules": false,
+        "url": "https://github.com/toml-f/toml-f"
+      },
+      "hash": "sha256-sCU0uMdcXIA5O964hlK37cOrLTlk1CJeTcWD9FhevOs=",
+      "path": "git/toml-f"
+    }
+  ],
+  "extraInputs": [],
+  "inputs": {
+    "fpm.toml": {
+      "content": "name = \"purifier-proof\"\nversion = \"0.1.0\"\nlicense = \"MIT\"\n[dependencies]\njonquil = { git = \"https://github.com/toml-f/jonquil.git\", tag = \"v0.3.0\" }\n",
+      "sha256": "7c2b75cde912e41be1e2e6fa932afdc9320e7700780d355805c1c743992f8a42"
+    }
+  },
+  "nodes": [
+    {
+      "dependencies": [
+        "toml-f"
+      ],
+      "entry": "git/jonquil",
+      "name": "jonquil",
+      "requested": "v0.3.0",
+      "revision": "4d43ffea512977602f654ab10067fcddb3e3c107",
+      "url": "https://github.com/toml-f/jonquil.git",
+      "version": "0.3.0"
+    },
+    {
+      "dependencies": [],
+      "entry": "git/toml-f",
+      "name": "toml-f",
+      "requested": "v0.4.1",
+      "revision": "6290b0bc5f5ebeff231625a3b6685de85f33fc79",
+      "url": "https://github.com/toml-f/toml-f",
+      "version": "0.4.1"
+    }
+  ],
+  "project": {
+    "name": "purifier-proof",
+    "version": "0.1.0"
+  },
+  "purifier": "fpm",
+  "toolVersions": {
+    "fpm": "0.13.0",
+    "gcc": "16.2.0",
+    "gfortran": "16.2.0",
+    "sdk": "5b036cac2f8b84cda78f8c83831823c158181207fe4ab4a58912d17124b81642"
+  },
+  "version": 1
+}

@@ -1,0 +1,5 @@
+name = "purifier-proof"
+version = "0.1.0"
+license = "MIT"
+[dependencies]
+jonquil = { git = "https://github.com/toml-f/jonquil.git", tag = "v0.3.0" }
