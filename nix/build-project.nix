@@ -11,6 +11,8 @@
   gfortran,
   gcc,
   sdkVersion,
+  stdenv,
+  binutils,
 }:
 {
   src,
@@ -19,9 +21,10 @@
   nativeBuildInputs ? [ ],
   buildFlags ? [ ],
   doCheck ? true,
+  nativeProducts ? { },
   buildCommand ? "fpm build",
   checkCommand ? "fpm test",
-  installCommand ? "",
+  installCommand ? if nativeProducts == { } then "" else ''fpm install --prefix "$out" --no-rebuild'',
   srcFilter ?
     path: type:
     !(builtins.elem (baseNameOf path) [
@@ -34,6 +37,36 @@
 }:
 let
   lock = purifier.checkLock (import ./read-lock.nix { inherit lib; } { inherit src lockFile; });
+  nativeSelected = nativeProducts != { };
+  rootName = lock.data.project.name;
+  libraryFile = "lib${rootName}${stdenv.hostPlatform.extensions.sharedLibrary}";
+  symbol = s: builtins.isString s && builtins.match "[A-Za-z_][A-Za-z0-9_]*" s != null;
+  validProduct =
+    product:
+    builtins.isAttrs product
+    &&
+      builtins.attrNames product == [
+        "abi"
+        "exports"
+        "runtime"
+      ]
+    && product.abi == "c"
+    && builtins.isList product.exports
+    && product.exports != [ ]
+    && builtins.all symbol product.exports
+    && builtins.length (lib.unique product.exports) == builtins.length product.exports
+    && builtins.isAttrs product.runtime
+    &&
+      builtins.attrNames product.runtime == [
+        "kind"
+        "lifecycle"
+      ]
+    && product.runtime.kind == "gfortran"
+    && product.runtime.lifecycle == "caller-managed";
+  nativeValid =
+    builtins.isAttrs nativeProducts
+    && builtins.attrNames nativeProducts == [ rootName ]
+    && validProduct nativeProducts.${rootName};
   environment =
     import ./environment.nix
       {
@@ -88,7 +121,7 @@ let
       *) exec ${nativeFpm}/bin/fpm "$purifier_command" "$@" ;;
     esac
   '';
-  project =
+  builtProject =
     runCommand "purified-fortran-project"
       {
         nativeBuildInputs = [
@@ -96,6 +129,11 @@ let
           python3
         ]
         ++ nativeBuildInputs;
+        nativeSpec = builtins.toJSON {
+          products = nativeProducts;
+          inherit rootName libraryFile;
+          system = stdenv.hostPlatform.system;
+        };
       }
       ''
         unset FPM_FC FPM_CC FPM_CXX FPM_AR FPM_FFLAGS FPM_CFLAGS FPM_CXXFLAGS FPM_LDFLAGS FC CC CXX AR FFLAGS CFLAGS CXXFLAGS LDFLAGS
@@ -113,10 +151,37 @@ let
         cd "$out/source"
         ${buildCommand}
         ${lib.optionalString doCheck checkCommand}
+        ${lib.optionalString nativeSelected ''
+          python3 ${./native-artifact.py} preflight "$out" ${binutils}/bin/nm "$TMPDIR/native-root.json"
+        ''}
         ${installCommand}
+        ${lib.optionalString nativeSelected ''
+          python3 ${./native-artifact.py} installed "$out" ${binutils}/bin/nm "$TMPDIR/native-root.json"
+        ''}
         fpm build --show-model --dump "$out/model.json" > "$TMPDIR/model-display.log"
         python3 ${../fpm_purifier/check-project.py} ${manifest} "$out/model.json"
       '';
+  projections = lib.optionalAttrs nativeSelected (
+    purifier.nativeProjections {
+      producer = builtProject;
+      libraries.${rootName} = "lib/${libraryFile}";
+      targetMetadata.${rootName} = nativeProducts.${rootName} // {
+        type = "shared-library";
+        nativeModel = "${builtProject}/model.json";
+        compiler = {
+          name = "gfortran";
+          version = gfortran.version;
+          path = toString gfortran;
+          runtimePath = toString gfortran.cc.lib;
+        };
+      };
+      system = stdenv.hostPlatform.system;
+      inherit runCommand python3;
+    }
+  );
+  project = builtProject // {
+    inherit projections;
+  };
   release =
     runCommand "fpm-source-release"
       {
@@ -134,6 +199,9 @@ let
         python3 ${../fpm_purifier/release.py} ${manifest} "$PWD/source" "$out" ${nativeFpm}/bin/fpm
       '';
 in
+assert
+  (!nativeSelected || nativeValid)
+  || throw "fpm-purifier: nativeProducts requires one root C ABI product, distinct explicit exports and caller-managed gfortran runtime";
 assert lock.problems == [ ];
 assert lib.assertMsg (
   lock.data.toolVersions == {
@@ -149,6 +217,6 @@ assert lib.assertMsg (
     inherit project environment;
   };
   tests = project;
-  inherit release;
+  inherit release projections;
   fetches = lock.entries;
 }

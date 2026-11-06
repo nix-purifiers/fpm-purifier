@@ -1,0 +1,9 @@
+name = "purifier-native-proof"
+version = "0.1.0"
+license = "MIT"
+[library]
+type = "shared"
+[install]
+library = true
+[dependencies]
+jonquil = { git = "https://github.com/toml-f/jonquil.git", tag = "v0.3.0" }
