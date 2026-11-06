@@ -63,6 +63,20 @@ with tempfile.TemporaryDirectory(prefix="fpm-native-projections-") as temporary:
 let
  f=builtins.getFlake {json.dumps('path:'+str(HERE))};
  pkgs=import f.inputs.nixpkgs {{ system=builtins.currentSystem; overlays=[ f.overlays.default ]; }};
+ baseline=pkgs.fpm-purifier.buildFortranProject {{ src={root}; installCommand = ''fpm install --prefix "$out" --no-rebuild''; }};
+ competitor=pkgs.runCommand "fpm-competing-jonquil" {{ nativeBuildInputs=[ pkgs.gcc pkgs.python3 pkgs.binutils ]; }} ''
+   mkdir -p "$out/lib"
+   gcc -shared -fPIC -Wl,-soname,libjonquil.so -Wl,--no-as-needed ${{baseline.packages.project}}/lib/libjonquil.so -x c -o "$out/lib/libjonquil.so" - <<'C'
+int purifier_competitor_marker(void) {{ return 99; }}
+C
+   python3 - "$out" <<'PYTHON'
+import ctypes,json,pathlib,sys
+p=pathlib.Path(sys.argv[1]);lib=ctypes.CDLL(str(p/'lib/libjonquil.so'))
+assert lib.purifier_competitor_marker()==99
+(p/'marker.json').write_text(json.dumps({{'marker':99}}))
+PYTHON
+   readelf -d "$out/lib/libjonquil.so" > "$out/elf.txt"
+ '';
  built=pkgs.fpm-purifier.buildFortranProject {{ src={root}; nativeProducts=builtins.fromJSON {json.dumps(json.dumps(products))}; {extra} }};
 in {result}
 """
@@ -270,6 +284,28 @@ in {result}
     bad = build(extra, success=False)
     assert bad.returncode and "exports are not defined" in bad.stderr, bad.stderr
     rejected += 1
+    # Keep the expected installed dependency intact while a real competing
+    # Nix-store DSO (with SONAME and independently verified marker99) wins.
+    competing = 'patchelf --set-rpath "${competitor}/lib:$(patchelf --print-rpath "$purifier_native_artifact")" "$purifier_native_artifact"'
+    extra = (
+        "nativeBuildInputs = [ pkgs.patchelf pkgs.diffutils ]; buildCommand = ''"
+        + base
+        + competing
+        + "''; installCommand = ''"
+        + install
+        + 'cmp "$(find "$out/build" -name libjonquil.so -type f -print -quit)" "$out/lib/libjonquil.so"'
+        + "'';"
+    )
+    bad = build(extra, success=False)
+    assert (
+        bad.returncode and "native-built dependency origin differs" in bad.stderr
+    ), bad.stderr
+    competing_failure = [
+        line
+        for line in bad.stderr.splitlines()
+        if "native-built dependency origin differs" in line
+    ]
+    rejected += 1
     # Recapture an actual native static target; never fabricate a shared artifact.
     recipe = root / "fpm.toml"
     recipe.write_text(
@@ -287,6 +323,7 @@ in {result}
                 "nativeCapture": True,
                 "consumerOutput": output,
                 "rejected": rejected,
+                "competingOriginFailure": competing_failure,
             }
         )
     )

@@ -144,6 +144,22 @@ elif mode == "installed":
                     "FPM native dependency is unresolved or outside the Nix store: "
                     + line
                 )
+            needed = Path(fields[0]).name
+            if needed in receipt["libraries"]:
+                selected = (prefix / "lib" / needed).resolve(strict=True)
+                actual = Path(resolved).resolve(strict=True)
+                if (
+                    actual != selected
+                    or shared_elf(actual) != receipt["libraries"][needed]["sha256"]
+                ):
+                    raise ValueError(
+                        "FPM native-built dependency origin differs: "
+                        + needed
+                        + " -> "
+                        + str(actual)
+                        + "; expected "
+                        + str(selected)
+                    )
             if Path(resolved).name.startswith("libgfortran.so") and not Path(
                 resolved
             ).resolve().is_relative_to(Path(spec["runtimePath"]) / "lib"):

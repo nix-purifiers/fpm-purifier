@@ -142,7 +142,9 @@ architecture. Static archives, PIE executables, missing C exports, ambiguous
 artifacts, escaping paths and altered installed bytes are rejected. A custom
 `installCommand` must preserve the checked native root and dependency artifacts
 inside the output. Loader checks reject unresolved dependencies and require the
-recorded Fortran runtime, without ambient library-path overrides.
+recorded Fortran runtime, without ambient library-path overrides. Resolved native
+dependencies must match the selected installed files, even when another Nix-store
+library has the same dependency name.
 The native fpm model and actual output drive this check; the purifier does not
 reinterpret fpm feature/profile selection or infer a C ABI from a `.so` suffix.
 Native Fortran `.mod` files are compiler-specific and are not advertised as C
