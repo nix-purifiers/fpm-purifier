@@ -205,6 +205,18 @@ in {result}
     bad = build(extra, success=False)
     assert bad.returncode and "PIE executable" in bad.stderr, bad.stderr
     rejected += 1
+    extra = (
+        "nativeBuildInputs = [ pkgs.patchelf ]; buildCommand = builtins.fromJSON "
+        + json.dumps(
+            json.dumps(base + 'patchelf --remove-rpath "$purifier_native_artifact"')
+        )
+        + ";"
+    )
+    bad = build(extra, success=False)
+    assert (
+        bad.returncode and "unresolved or outside the Nix store" in bad.stderr
+    ), bad.stderr
+    rejected += 1
     install = 'fpm install --prefix "$out" --no-rebuild\n'
     for command, expected in [
         ('rm "$out/lib/libpurifier-native-proof.so"', "FileNotFoundError"),
@@ -223,6 +235,21 @@ in {result}
         (
             'find "$out/build" -name libpurifier-native-proof.so -type f -exec sh -c \'printf "\\n" >> "$1"\' _ {} \\;',
             "changed during installation",
+        ),
+    ]:
+        extra = (
+            "installCommand = builtins.fromJSON "
+            + json.dumps(json.dumps(install + command))
+            + ";"
+        )
+        bad = build(extra, success=False)
+        assert bad.returncode and expected in bad.stderr, bad.stderr
+        rejected += 1
+    for command, expected in [
+        ('rm "$out/lib/libjonquil.so"', "FileNotFoundError"),
+        (
+            'cp "$out/lib/libtoml-f.so" "$out/lib/libjonquil.so"',
+            "dependency bytes differ",
         ),
     ]:
         extra = (

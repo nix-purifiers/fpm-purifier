@@ -9,7 +9,7 @@ import struct
 import subprocess
 import sys
 
-mode, output, nm, receipt_path = sys.argv[1:]
+mode, output, nm, ldd, receipt_path = sys.argv[1:]
 spec = json.loads(os.environ["nativeSpec"])
 prefix = Path(output).absolute()
 if prefix.is_symlink():
@@ -81,8 +81,21 @@ if not artifact.is_relative_to(build) or not artifact.is_file():
 if mode == "preflight":
     digest = shared_elf(artifact)
     exports(artifact)
+    libraries = {}
+    for candidate in build.rglob("*.so"):
+        physical = candidate.resolve(strict=True)
+        if not physical.is_relative_to(build) or not physical.is_file():
+            raise ValueError("FPM native dependency escapes build output")
+        if candidate.name in libraries:
+            raise ValueError("FPM native dependency artifact is ambiguous")
+        libraries[candidate.name] = {
+            "artifact": str(physical),
+            "sha256": shared_elf(physical),
+        }
     Path(receipt_path).write_text(
-        json.dumps({"artifact": str(artifact), "sha256": digest})
+        json.dumps(
+            {"artifact": str(artifact), "sha256": digest, "libraries": libraries}
+        )
     )
 elif mode == "installed":
     receipt = json.loads(Path(receipt_path).read_text())
@@ -97,5 +110,45 @@ elif mode == "installed":
     if shared_elf(installed) != receipt["sha256"]:
         raise ValueError("FPM installed native bytes differ from native build")
     exports(installed)
+    clean_environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in ("LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT")
+    }
+    installed_libraries = []
+    for filename, expected in receipt["libraries"].items():
+        native = Path(expected["artifact"])
+        path = (prefix / "lib" / filename).resolve(strict=True)
+        if not path.is_relative_to(prefix) or not path.is_file():
+            raise ValueError("FPM installed dependency escapes producer")
+        if (
+            shared_elf(native) != expected["sha256"]
+            or shared_elf(path) != expected["sha256"]
+        ):
+            raise ValueError("FPM installed dependency bytes differ from native build")
+        installed_libraries.append(path)
+    for path in installed_libraries:
+        trace = subprocess.check_output(
+            [ldd, str(path)], text=True, env=clean_environment
+        )
+        for line in trace.splitlines():
+            fields = line.split()
+            if not fields or fields[0].startswith("linux-vdso"):
+                continue
+            resolved = fields[2] if len(fields) > 2 and fields[1] == "=>" else fields[0]
+            if (
+                not resolved.startswith(spec["storeDir"] + "/")
+                or not Path(resolved).is_file()
+            ):
+                raise ValueError(
+                    "FPM native dependency is unresolved or outside the Nix store: "
+                    + line
+                )
+            if Path(resolved).name.startswith("libgfortran.so") and not Path(
+                resolved
+            ).resolve().is_relative_to(Path(spec["runtimePath"]) / "lib"):
+                raise ValueError(
+                    "FPM linked Fortran runtime differs from compiler runtime"
+                )
 else:
     raise ValueError("unknown FPM native artifact operation")

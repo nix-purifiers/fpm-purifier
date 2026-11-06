@@ -140,7 +140,9 @@ run API initialization routines.
 A unique native-built root artifact must be an ELF shared library for the target
 architecture. Static archives, PIE executables, missing C exports, ambiguous
 artifacts, escaping paths and altered installed bytes are rejected. A custom
-`installCommand` must preserve the checked native artifact inside the output.
+`installCommand` must preserve the checked native root and dependency artifacts
+inside the output. Loader checks reject unresolved dependencies and require the
+recorded Fortran runtime, without ambient library-path overrides.
 The native fpm model and actual output drive this check; the purifier does not
 reinterpret fpm feature/profile selection or infer a C ABI from a `.so` suffix.
 Native Fortran `.mod` files are compiler-specific and are not advertised as C
