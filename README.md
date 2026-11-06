@@ -99,6 +99,61 @@ It exposes evaluation-known `packages`, `tests`, `release` and `fetches`.
 `build/` and `model.json`. Override `installCommand` for the project's installation
 layout, or `nativeBuildInputs` and `buildFlags` for its build requirements.
 
+## Native C ABI projections
+
+An opt-in `nativeProducts` declaration selects the locked root library after
+native fpm builds and installs it. Configure fpm to build a shared library and
+write the public Fortran procedures with `bind(C)`, then declare their C symbols:
+
+```nix
+pkgs.fpm-purifier.buildFortranProject {
+  src = ./.;
+  nativeProducts.my-library = {
+    abi = "c";
+    exports = [ "my_library_answer" ];
+    runtime = {
+      kind = "gfortran";
+      lifecycle = "caller-managed";
+    };
+  };
+}
+```
+
+The key must match the locked root package name. `exports` contains distinct,
+explicit C names actually defined by the native root library. Consumers supply
+compatible signatures, manage any initialization and finalization required by
+their API, and finish calls and release retained native state before closing a
+library. The tested `bind(C)` fixture returns values and retains no allocated
+state across calls; this does not establish universal initialization or safe
+unloading for arbitrary Fortran code.
+
+When selected, the default install hook runs native
+`fpm install --prefix "$out" --no-rebuild`. Both the result and
+`packages.project` expose `projections.native`, `projections.python-ffi` and
+`projections.java-ffi`. Their `catalog.json` records exact installed library
+paths, declared exports/lifecycle, compiler/runtime identities and the native
+model path. `purifier_native.py` loads libraries lazily with ctypes; `java.args`
+provides the library search path. These views retain the producer's installed
+dependency libraries and runtime closure. Loading does not generate bindings or
+run API initialization routines.
+
+A unique native-built root artifact must be an ELF shared library for the target
+architecture. Static archives, PIE executables, missing C exports, ambiguous
+artifacts, escaping paths and altered installed bytes are rejected. A custom
+`installCommand` must preserve the checked native artifact inside the output.
+The native fpm model and actual output drive this check; the purifier does not
+reinterpret fpm feature/profile selection or infer a C ABI from a `.so` suffix.
+Native Fortran `.mod` files are compiler-specific and are not advertised as C
+headers. Defaults and existing locks keep their ordinary build behavior with
+empty projections.
+
+The host test captures the actual runner graph with `jonquil` and `toml-f`,
+then exercises C, ctypes, CFFI and scoped Java FFM calls. Function-pointer checks
+verify the root, installed dependencies and pinned GNU Fortran runtime origins.
+The static baseline and a shared build without the declared `bind(C)` export
+remain explicit controls. Runtime support on each Linux architecture requires
+its native CI run.
+
 ## Credits
 
 The purifier idea was inspired by nixcloud's

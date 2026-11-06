@@ -218,3 +218,6 @@ with tempfile.TemporaryDirectory() as temporary:
         "0.13.0" in ordinary.stdout and "ordinary impure resolution" in ordinary.stderr
     )
 print("Native fpm conformance passed")
+
+# Capture and consume native projection fixtures on this actual runner.
+run(["python3", HERE / "tests/native-projections.py"])
