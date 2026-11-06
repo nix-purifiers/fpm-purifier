@@ -13,6 +13,7 @@
   sdkVersion,
   stdenv,
   binutils,
+  glibc,
 }:
 {
   src,
@@ -132,6 +133,8 @@ let
         nativeSpec = builtins.toJSON {
           products = nativeProducts;
           inherit rootName libraryFile;
+          storeDir = builtins.storeDir;
+          runtimePath = toString gfortran.cc.lib;
           system = stdenv.hostPlatform.system;
         };
       }
@@ -152,11 +155,11 @@ let
         ${buildCommand}
         ${lib.optionalString doCheck checkCommand}
         ${lib.optionalString nativeSelected ''
-          python3 ${./native-artifact.py} preflight "$out" ${binutils}/bin/nm "$TMPDIR/native-root.json"
+          python3 ${./native-artifact.py} preflight "$out" ${binutils}/bin/nm ${glibc.bin}/bin/ldd "$TMPDIR/native-root.json"
         ''}
         ${installCommand}
         ${lib.optionalString nativeSelected ''
-          python3 ${./native-artifact.py} installed "$out" ${binutils}/bin/nm "$TMPDIR/native-root.json"
+          python3 ${./native-artifact.py} installed "$out" ${binutils}/bin/nm ${glibc.bin}/bin/ldd "$TMPDIR/native-root.json"
         ''}
         fpm build --show-model --dump "$out/model.json" > "$TMPDIR/model-display.log"
         python3 ${../fpm_purifier/check-project.py} ${manifest} "$out/model.json"
