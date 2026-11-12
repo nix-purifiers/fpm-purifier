@@ -26,7 +26,7 @@
             nixpkgsSrc = nixpkgs;
             purifierSrc = purifier;
           };
-          buildFortranProject = scope.callPackage ./nix/build-project.nix {
+          buildFortranProject = scope.callPackage ./pkgs/build-fortran-project {
             purifier = import (purifier + "/nix/lib") { inherit (final) lib; };
           };
         });
@@ -45,7 +45,7 @@
         cli = self.packages.${system}.default;
         sdk = (pkgsFor system).fpm-purifier.toolchain;
       });
-      lib.fpm-purifier.readLock = import ./nix/read-lock.nix { lib = nixpkgs.lib; };
+      lib.fpm-purifier = (nixpkgs.lib.extend (import ./lib-overlays/default { }).overlay).fpm-purifier;
       apps = forAll (system: {
         default = {
           type = "app";

@@ -37,7 +37,9 @@
     ]),
 }:
 let
-  lock = purifier.checkLock (import ./read-lock.nix { inherit lib; } { inherit src lockFile; });
+  lock = purifier.checkLock (
+    import ../../lib-overlays/default/read-lock.nix { inherit lib; } { inherit src lockFile; }
+  );
   nativeSelected = nativeProducts != { };
   rootName = lock.data.project.name;
   libraryFile = "lib${rootName}${stdenv.hostPlatform.extensions.sharedLibrary}";
@@ -162,7 +164,7 @@ let
           python3 ${./native-artifact.py} installed "$out" ${binutils}/bin/nm ${glibc.bin}/bin/ldd "$TMPDIR/native-root.json"
         ''}
         fpm build --show-model --dump "$out/model.json" > "$TMPDIR/model-display.log"
-        python3 ${../fpm_purifier/check-project.py} ${manifest} "$out/model.json"
+        python3 ${../../fpm_purifier/check-project.py} ${manifest} "$out/model.json"
       '';
   projections = lib.optionalAttrs nativeSelected (
     purifier.nativeProjections {
@@ -199,7 +201,7 @@ let
         cp -pr ${source}/. source/
         chmod -R u+w source
         cp ${lockFile} source/fpm-purifier.lock.json
-        python3 ${../fpm_purifier/release.py} ${manifest} "$PWD/source" "$out" ${nativeFpm}/bin/fpm
+        python3 ${../../fpm_purifier/release.py} ${manifest} "$PWD/source" "$out" ${nativeFpm}/bin/fpm
       '';
 in
 assert

@@ -17,10 +17,10 @@ let
     src = /. + project;
     lockFile = /. + companion;
   };
-  lock = import ./read-lock.nix { inherit (pkgs) lib; } args;
+  lock = import ../lib-overlays/default/read-lock.nix { inherit (pkgs) lib; } args;
   output =
     if target == "environment" then
-      pkgs.callPackage ./environment.nix
+      pkgs.callPackage ../pkgs/build-fortran-project/environment.nix
         {
           inherit
             purifier
@@ -34,7 +34,7 @@ let
           buildFlags = builtins.fromJSON flags;
         }
     else if target == "release" then
-      (pkgs.callPackage ./build-project.nix {
+      (pkgs.callPackage ../pkgs/build-fortran-project {
         inherit
           purifier
           nativeFpm
