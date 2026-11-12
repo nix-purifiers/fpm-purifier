@@ -71,13 +71,13 @@ runCommand "purified-fortran-environment"
     export PATH=${toolchain}/bin:$PATH HOME="$TMPDIR/home" FPM_BUILD_DIR="$out/build" FPM_PURIFIER_FROZEN=1 FPM_PURIFIER_DEPS_ONLY=1
     mkdir -p "$HOME" "$out/build" project/src
     python3 -c 'import json,pathlib;d=json.load(open("${manifest}"));[(pathlib.Path("project",n).parent.mkdir(parents=True,exist_ok=True),pathlib.Path("project",n).write_text(v["content"])) for n,v in d["inputs"].items()]'
-    python3 ${../fpm_purifier/stage.py} ${manifest} ${sources} "$out/build/cache.toml"
+    python3 ${../../fpm_purifier/stage.py} ${manifest} ${sources} "$out/build/cache.toml"
     cd project
     fpm build --no-prune --verbose ${lib.escapeShellArgs (selection ++ buildFlags)}
     fpm build --no-prune --show-model --dump "$TMPDIR/model.json" ${
       lib.escapeShellArgs (selection ++ buildFlags)
     } > "$TMPDIR/model-display.log"
-    python3 ${../fpm_purifier/check-project.py} ${manifest} "$TMPDIR/model.json"
+    python3 ${../../fpm_purifier/check-project.py} ${manifest} "$TMPDIR/model.json"
     cp ${manifest} "$out/capture.json"
     ln -s ${sources} "$out/sources"
   ''

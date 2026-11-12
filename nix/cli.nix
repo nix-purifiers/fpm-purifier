@@ -22,7 +22,7 @@ stdenvNoCC.mkDerivation {
   dontBuild = true;
   installPhase = ''
     mkdir -p "$out/bin" "$out/lib/fpm-purifier"
-    cp -r fpm_purifier nix "$out/lib/fpm-purifier/"
+    cp -r fpm_purifier nix lib-overlays pkgs "$out/lib/fpm-purifier/"
     install -m755 bin/fpm-purifier "$out/bin/fpm-purifier"
     substituteInPlace "$out/lib/fpm-purifier/nix/realize.nix" --replace-fail '@nixpkgs@' '${nixpkgsSrc}' --replace-fail '@purifier@' '${purifierSrc}'
     wrapProgram "$out/bin/fpm-purifier" \
